@@ -11,29 +11,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Load the necessary libraries
 ```{r}
-
-if (!requireNamespace("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager")
-}
-BiocManager::install("msa")
-
-library(seqinr)
-library(msa)
+library(Biostrings)
 library(ape)
-
-file.exists("sequences.fasta")
+library(seqinr)
 ```
 
 
 Load the sequences
 ```{r}
-secuencias <- read.fasta(
-  file = "sequences.fasta", 
-  seqtype = "DNA", 
-  as.string = FALSE, 
-  forceDNAtolower = TRUE 
-  
-  cat("Se han cargado", length(secuencias), "secuencias")
+seqs <- readDNAStringSet("sequences.fasta")
+seqs
 
 ```
 
@@ -41,100 +28,48 @@ Identify geographical region
 ```{r}
 metadata <- read.delim("Accesion numbers.txt", header = TRUE)
 View(metadata)
+
+```
+
+Get the complementarty sequence
+```{r}
+complementary_seqs <- Biostrings::complement(seqs)
+sub_complementary <- Biostrings::subseq(complementary_seqs, start = 1, end = 30)
+print(sub_complementary)
+```
+
+Nucleotide compositon
+```{r}
+base_freqs <- Biostrings::alphabetFrequency(seqs, baseOnly = TRUE)
+pure_freqs <- base_freqs[, c("A", "C", "G", "T")]
+dist_matrix <- dist(pure_freqs)
+print(as.matrix(dist_matrix))
 ```
 
 
-
-
 ```{r}
-
-
-# ==========================================
-# 2. Identificar la región geográfica
-# ==========================================
-# Nota: R no extrae mágicamente la geografía solo del FASTA sin consultar una base de datos.
-# Dado que tienes el archivo "Accesion numbers.txt", la forma más directa (sin usar APIs complejas)
-# es leer ese archivo si contiene la metadata descargada de NCBI Virus.
-#
-# Asumiendo que es una tabla separada por tabulaciones o comas de NCBI:
-# metadata <- read.delim("Accesion numbers.txt", header = TRUE)
-# View(metadata) # Aquí podrás observar la columna "Geo Location" asociada a cada Accession.
-
-# ==========================================
-# 3. Obtener la secuencia complementaria (primeras 30 bases)
-# ==========================================
-cat("\n--- Secuencias Complementarias (Primeras 30 bases) ---\n")
-
-# Usamos lapply para iterar sobre cada secuencia, comp() para obtener la complementaria,
-# extraemos los primeros 30 nucleótidos y los unimos con paste.
-complementarias_30 <- lapply(secuencias, function(seq) {
-  comp_seq <- comp(seq) 
-  paste(comp_seq[1:30], collapse = "")
-})
-
-# Imprimir el resultado
-print(complementarias_30)
-
-# ==========================================
-# 4. Composición de nucleótidos de cada variante
-# ==========================================
-cat("\n--- Composición de Nucleótidos ---\n")
-
-# Contamos cuántas a, c, g, t tiene cada secuencia
-composicion <- t(sapply(secuencias, function(seq) {
+composition <- t(sapply(seqs, function(seq) {
   table(factor(seq, levels = c("a", "c", "g", "t")))
 }))
+print(composition)
+```
 
-# Mostramos la tabla de frecuencias
-print(composicion)
+```{r}
+lengths <- width(seqs)
+barplot(lengths, names.arg = names(seqs), 
+        main = "Length comparison",
+         col = hcl.colors(4, "Plasma"),, las = 2, cex.names = 0.7)
+```
 
-# ==========================================
-# 5. Construir una matriz de distancias
-# ==========================================
-# ¡Recuerda la lección de la sesión 9! No podemos calcular distancias sin antes ALINEAR.
-cat("\n--- Alineando secuencias y calculando matriz de distancias ---\n")
+```{r}
+final_distance <- as.dist(as.matrix(dist_matrix))
+arbol <- ape::nj(final_distance)
+par(mar=c(1,1,2,1)) 
+plot(arbol, 
+     main = "Phylogenetic tree",
+     edge.width = 2,
+     cex = 0.8)
 
-# Realizamos el alineamiento múltiple (MSA)
-alineamiento <- msa("sequences.fasta", method = "ClustalOmega", type = "dna")
-
-# Convertimos a formato DNAbin para el paquete ape
-alineamiento_dnabin <- as.DNAbin(msaConvert(alineamiento, type = "seqinr::alignment"))
-
-# Calculamos la matriz de distancias (usando el modelo Jukes-Cantor JC69)
-matriz_distancias <- dist.dna(alineamiento_dnabin, model = "JC69", pairwise.deletion = TRUE)
-
-print(matriz_distancias)
-
-# ==========================================
-# 6. Gráfica comparativa de longitudes
-# ==========================================
-# Extraemos las longitudes
-longitudes <- sapply(secuencias, length)
-
-# Creamos un gráfico de barras
-par(mar = c(10, 4, 4, 2)) # Ajustamos márgenes para que los nombres no se corten
-barplot(
-  longitudes, 
-  main = "Comparación de Longitud de Secuencias", 
-  ylab = "Número de Nucleótidos", 
-  col = "steelblue", 
-  las = 2, # Rota las etiquetas del eje X para que sean legibles
-  cex.names = 0.7
-)
-
-# ==========================================
-# 7. Dibujar un árbol filogenético (Dendrograma)
-# ==========================================
-# Usamos Neighbor Joining (NJ) como vimos en clase
-arbol_nj <- nj(matriz_distancias)
-
-# Graficamos el árbol
-par(mar = c(5, 4, 4, 2)) # Restauramos márgenes
-plot(
-  arbol_nj, 
-  main = "Árbol Filogenético de Variantes (Neighbor Joining)", 
-  cex = 0.8
-)
-axisPhylo() # Añade la escala de distancia evolutiva
+add.scale.bar()
 ```
 
