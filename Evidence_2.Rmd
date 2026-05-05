@@ -26,8 +26,8 @@ seqs
 
 Identify geographical region
 ```{r}
-metadata <- read.delim("Accesion numbers.txt", header = TRUE)
-View(metadata)
+#metadata <- read.delim("Accesion numbers.txt", header = TRUE)
+#View(metadata)
 
 ```
 
